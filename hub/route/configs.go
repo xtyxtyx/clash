@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"github.com/Dreamacro/clash/config"
 	"github.com/Dreamacro/clash/hub/executor"
 	"github.com/Dreamacro/clash/log"
 	P "github.com/Dreamacro/clash/proxy"
@@ -25,6 +26,7 @@ type configSchema struct {
 	Port        *int          `json:"port"`
 	SocksPort   *int          `json:"socks-port"`
 	RedirPort   *int          `json:"redir-port"`
+	Tun         *config.Tun   `json:"tun"`
 	AllowLan    *bool         `json:"allow-lan"`
 	BindAddress *string       `json:"bind-address"`
 	Mode        *T.Mode       `json:"mode"`
@@ -64,6 +66,9 @@ func patchConfigs(w http.ResponseWriter, r *http.Request) {
 	P.ReCreateHTTP(pointerOrDefault(general.Port, ports.Port))
 	P.ReCreateSocks(pointerOrDefault(general.SocksPort, ports.SocksPort))
 	P.ReCreateRedir(pointerOrDefault(general.RedirPort, ports.RedirPort))
+	if general.Tun != nil {
+		P.ReCreateTun(general.Tun.Enable, general.Tun.LinuxIfName)
+	}
 
 	if general.Mode != nil {
 		T.Instance().SetMode(*general.Mode)
