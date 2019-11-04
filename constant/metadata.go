@@ -18,6 +18,7 @@ const (
 	HTTPCONNECT
 	SOCKS
 	REDIR
+	TUN
 )
 
 type NetWork int
