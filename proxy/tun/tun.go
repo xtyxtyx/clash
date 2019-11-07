@@ -91,7 +91,6 @@ func NewTunProxy(deviceURL string) (*TunAdapter, error) {
 	ipstack.SetTransportProtocolHandler(tcp.ProtocolNumber, tcpFwd.HandlePacket)
 
 	// UDP handler
-
 	udpFwd := udp.NewForwarder(ipstack, func(r *udp.ForwarderRequest) {
 
 		var wq waiter.Queue
@@ -120,6 +119,7 @@ func NewTunProxy(deviceURL string) (*TunAdapter, error) {
 // Close close the TunAdapter
 func (t *TunAdapter) Close() {
 	t.device.Close()
+	ipstack.Close()
 }
 
 // IfName return the NIC name of tun
