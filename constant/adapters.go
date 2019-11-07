@@ -13,6 +13,7 @@ const (
 	Fallback
 	Reject
 	Selector
+	Redirect
 	Shadowsocks
 	Snell
 	Socks5
@@ -92,6 +93,8 @@ func (at AdapterType) String() string {
 		return "Reject"
 	case Selector:
 		return "Selector"
+	case Redirect:
+		return "Redirect"
 	case Shadowsocks:
 		return "Shadowsocks"
 	case Snell:

@@ -376,6 +376,19 @@ func parseProxies(cfg *rawConfig) (map[string]C.Proxy, error) {
 				return nil, fmt.Errorf("ProxyGroup %s: %s", groupName, err.Error())
 			}
 			group, err = adapters.NewSelector(selectorOption.Name, ps)
+		case "redirect":
+			redirectOption := &adapters.RedirectOption{}
+			err = decoder.Decode(mapping, redirectOption)
+			if err != nil {
+				break
+			}
+
+			ps, err = getProxies(proxies, redirectOption.Proxies)
+			if err != nil {
+				return nil, fmt.Errorf("ProxyGroup %s: %s", groupName, err.Error())
+			}
+
+			group, err = adapters.NewRedirect(redirectOption.Name, *redirectOption, ps)
 		case "fallback":
 			fallbackOption := &adapters.FallbackOption{}
 			err = decoder.Decode(mapping, fallbackOption)
