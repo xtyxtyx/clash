@@ -16,6 +16,7 @@ import (
 
 type tun struct {
 	url       string
+	name      string
 	fd        int
 	closeFd   bool
 	linkCache *stack.LinkEndpoint
@@ -78,6 +79,7 @@ func (t tun) openDeviceByName(name string) (TunDevice, error) {
 		return nil, err
 	}
 
+	t.name = name
 	t.fd = fd
 	t.closeFd = true
 
@@ -100,6 +102,7 @@ func (t tun) openDeviceByFd(fd int) (TunDevice, error) {
 		return nil, errors.New("Only tun device and no pi mode supported")
 	}
 
+	t.name = convertInterfaceName(ifr.name)
 	t.fd = fd
 	t.closeFd = false
 
@@ -120,10 +123,24 @@ func (t tun) getInterfaceMtu() (uint32, error) {
 		_    [20]byte
 	}
 
+	copy(ifreq.name[:], t.name)
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.SIOCGIFMTU, uintptr(unsafe.Pointer(&ifreq)))
 	if errno != 0 {
 		return 0, errno
 	}
 
 	return uint32(ifreq.mtu), nil
+}
+
+func convertInterfaceName(buf [16]byte) string {
+	var n int
+
+	for i, c := range buf {
+		if c == 0 {
+			n = i
+			break
+		}
+	}
+
+	return string(buf[:n])
 }
