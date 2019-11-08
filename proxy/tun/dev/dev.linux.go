@@ -41,6 +41,10 @@ func OpenTunDevice(deviceURL url.URL) (TunDevice, error) {
 	return nil, errors.New("Unsupported device type " + deviceURL.Scheme)
 }
 
+func (t tun) Name() string {
+	return t.name
+}
+
 func (t tun) URL() string {
 	return t.url
 }

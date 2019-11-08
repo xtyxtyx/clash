@@ -110,7 +110,7 @@ func NewTunProxy(deviceURL string) (*TunAdapter, error) {
 		device:  tundev,
 		ipstack: ipstack,
 	}
-	log.Infoln("Tun device opened by %s", tundev.URL())
+	log.Infoln("Tun adapter have interface name: %s", tundev.Name())
 
 	return tl, nil
 
