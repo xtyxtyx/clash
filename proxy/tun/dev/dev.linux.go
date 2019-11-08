@@ -18,7 +18,6 @@ type tun struct {
 	url       string
 	name      string
 	fd        int
-	closeFd   bool
 	linkCache *stack.LinkEndpoint
 }
 
@@ -72,9 +71,7 @@ func (t tun) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
 }
 
 func (t tun) Close() {
-	if t.closeFd {
-		syscall.Close(t.fd)
-	}
+	syscall.Close(t.fd)
 }
 
 func (t tun) openDeviceByName(name string) (TunDevice, error) {
@@ -85,7 +82,6 @@ func (t tun) openDeviceByName(name string) (TunDevice, error) {
 
 	t.name = name
 	t.fd = fd
-	t.closeFd = true
 
 	return t, nil
 }
@@ -95,6 +91,11 @@ func (t tun) openDeviceByFd(fd int) (TunDevice, error) {
 		name  [16]byte
 		flags uint16
 		_     [22]byte
+	}
+
+	fd, err := syscall.Dup(fd)
+	if err != nil {
+		return nil, err
 	}
 
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TUNGETIFF, uintptr(unsafe.Pointer(&ifr)))
@@ -108,7 +109,6 @@ func (t tun) openDeviceByFd(fd int) (TunDevice, error) {
 
 	t.name = convertInterfaceName(ifr.name)
 	t.fd = fd
-	t.closeFd = false
 
 	return t, nil
 }
