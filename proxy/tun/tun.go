@@ -58,7 +58,7 @@ func NewTunProxy(deviceURL string) (*TunAdapter, error) {
 
 	linkEP, err := tundev.AsLinkEndpoint()
 	if err != nil {
-		return nil, fmt.Errorf("Unablt to create virtual endpoint", err)
+		return nil, fmt.Errorf("Unable to create virtual endpoint: %v", err)
 	}
 
 	if err := ipstack.CreateNIC(1, linkEP); err != nil {
