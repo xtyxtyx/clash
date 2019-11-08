@@ -15,9 +15,10 @@ import (
 )
 
 type tun struct {
-	name    string
-	fd      int
-	closeFd bool
+	name      string
+	fd        int
+	closeFd   bool
+	linkCache *stack.LinkEndpoint
 }
 
 func OpenTunDevice(deviceURL url.URL) (TunDevice, error) {
@@ -39,18 +40,26 @@ func (t tun) Name() string {
 	return t.name
 }
 
-func (t tun) AsLinkEndpoint() (stack.LinkEndpoint, error) {
+func (t tun) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
+	if t.linkCache != nil {
+		return *t.linkCache, nil
+	}
+
 	mtu, err := t.getInterfaceMtu()
 
 	if err != nil {
 		return nil, errors.New("Unable to get device mtu")
 	}
 
-	return fdbased.New(&fdbased.Options{
+	result, err = fdbased.New(&fdbased.Options{
 		FDs:            []int{t.fd},
 		MTU:            mtu,
 		EthernetHeader: false,
 	})
+
+	t.linkCache = &result
+
+	return result, nil
 }
 
 func (t tun) Close() {
