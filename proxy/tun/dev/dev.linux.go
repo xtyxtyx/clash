@@ -10,6 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/google/netstack/tcpip/link/fdbased"
+	stacktun "github.com/google/netstack/tcpip/link/tun"
 	"github.com/google/netstack/tcpip/stack"
 )
 
@@ -59,32 +60,13 @@ func (t tun) Close() {
 }
 
 func openDeviceByName(name string) (TunDevice, error) {
-	fd, err := syscall.Open("/dev/net/tun", syscall.O_RDWR, 0)
+	fd, err := stacktun.Open(name)
 	if err != nil {
 		return nil, err
 	}
 
-	var ifr struct {
-		name  [16]byte
-		flags uint16
-		_     [22]byte
-	}
-
-	copy(ifr.name[:], name)
-	ifr.flags = syscall.IFF_TUN | syscall.IFF_NO_PI
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.TUNSETIFF, uintptr(unsafe.Pointer(&ifr)))
-	if errno != 0 {
-		syscall.Close(fd)
-		return nil, errno
-	}
-
-	if err = syscall.SetNonblock(fd, true); err != nil {
-		syscall.Close(fd)
-		return nil, err
-	}
-
 	return &tun{
-		name:    convertInterfaceName(ifr.name),
+		name:    name,
 		fd:      fd,
 		closeFd: true,
 	}, nil
