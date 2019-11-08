@@ -43,7 +43,7 @@ func NewTunProxy(deviceURL string) (*TunAdapter, error) {
 
 	url, err := url.Parse(deviceURL)
 	if err != nil {
-		return nil, fmt.Errorf("Can't open tun: %v", err)
+		return nil, fmt.Errorf("Invalid tun device url: %v", err)
 	}
 
 	tundev, err := dev.OpenTunDevice(*url)
