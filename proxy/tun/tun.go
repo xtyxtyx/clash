@@ -110,7 +110,7 @@ func NewTunProxy(deviceURL string) (*TunAdapter, error) {
 		device:  tundev,
 		ipstack: ipstack,
 	}
-	log.Infoln("Tun adapter have interface name: %s", tundev.Name())
+	log.Infoln("Tun device opened by %s", tundev.URL())
 
 	return tl, nil
 
@@ -122,9 +122,9 @@ func (t *TunAdapter) Close() {
 	t.device.Close()
 }
 
-// IfName return the NIC name of tun
-func (t *TunAdapter) IfName() string {
-	return t.device.Name()
+// IfName return device URL of tun
+func (t *TunAdapter) DeviceURL() string {
+	return t.device.URL()
 }
 
 func getAddr(id stack.TransportEndpointID) socks5.Addr {
