@@ -15,7 +15,7 @@ import (
 )
 
 type tun struct {
-	name      string
+	url       string
 	fd        int
 	closeFd   bool
 	linkCache *stack.LinkEndpoint
@@ -24,20 +24,24 @@ type tun struct {
 func OpenTunDevice(deviceURL url.URL) (TunDevice, error) {
 	switch deviceURL.Scheme {
 	case "dev":
-		return openDeviceByName(deviceURL.Host)
+		return tun{
+			url: deviceURL.String(),
+		}.openDeviceByName(deviceURL.Host)
 	case "fd":
 		fd, err := strconv.ParseInt(deviceURL.Host, 10, 32)
 		if err != nil {
 			return nil, err
 		}
-		return openDeviceByFd(int(fd))
+		return tun{
+			url: deviceURL.String(),
+		}.openDeviceByFd(int(fd))
 	}
 
 	return nil, errors.New("Unsupported device type " + deviceURL.Scheme)
 }
 
-func (t tun) Name() string {
-	return t.name
+func (t tun) URL() string {
+	return t.url
 }
 
 func (t tun) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
@@ -68,20 +72,19 @@ func (t tun) Close() {
 	}
 }
 
-func openDeviceByName(name string) (TunDevice, error) {
+func (t tun) openDeviceByName(name string) (TunDevice, error) {
 	fd, err := stacktun.Open(name)
 	if err != nil {
 		return nil, err
 	}
 
-	return &tun{
-		name:    name,
-		fd:      fd,
-		closeFd: true,
-	}, nil
+	t.fd = fd
+	t.closeFd = true
+
+	return t, nil
 }
 
-func openDeviceByFd(fd int) (TunDevice, error) {
+func (t tun) openDeviceByFd(fd int) (TunDevice, error) {
 	var ifr struct {
 		name  [16]byte
 		flags uint16
@@ -97,11 +100,10 @@ func openDeviceByFd(fd int) (TunDevice, error) {
 		return nil, errors.New("Only tun device and no pi mode supported")
 	}
 
-	return &tun{
-		name:    convertInterfaceName(ifr.name),
-		fd:      fd,
-		closeFd: false,
-	}, nil
+	t.fd = fd
+	t.closeFd = false
+
+	return t, nil
 }
 
 func (t tun) getInterfaceMtu() (uint32, error) {
@@ -118,24 +120,10 @@ func (t tun) getInterfaceMtu() (uint32, error) {
 		_    [20]byte
 	}
 
-	copy(ifreq.name[:], t.name)
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), syscall.SIOCGIFMTU, uintptr(unsafe.Pointer(&ifreq)))
 	if errno != 0 {
 		return 0, errno
 	}
 
 	return uint32(ifreq.mtu), nil
-}
-
-func convertInterfaceName(buf [16]byte) string {
-	var n int
-
-	for i, c := range buf {
-		if c == 0 {
-			n = i
-			break
-		}
-	}
-
-	return string(buf[:n])
 }
