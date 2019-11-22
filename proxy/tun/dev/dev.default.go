@@ -10,5 +10,5 @@ import (
 )
 
 func OpenTunDevice(_ url.URL) (TunDevice, error) {
-	return nil, errors.New("Unsupported platform " + runtime.GOOS)
+	return nil, errors.New("Unsupported platform " + runtime.GOOS + "/" + runtime.GOARCH)
 }
