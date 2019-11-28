@@ -54,11 +54,11 @@ type tunDarwin struct {
 	tunFile   *os.File
 	linkCache *channel.Endpoint
 	errors    chan error
-	closed    bool
 
-	wg       sync.WaitGroup // wait for goroutines to stop
+	closed    bool
 	stopW    chan struct{}
 	stopOnce sync.Once
+	wg       sync.WaitGroup // wait for goroutines to stop
 }
 
 // sockaddr_ctl specifeid in /usr/include/sys/kern_control.h
