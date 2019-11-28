@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"sync"
 	"syscall"
 	"unsafe"
 
@@ -53,6 +54,11 @@ type tunDarwin struct {
 	tunFile   *os.File
 	linkCache *channel.Endpoint
 	errors    chan error
+	closed    bool
+
+	wg       sync.WaitGroup // wait for goroutines to stop
+	stopW    chan struct{}
+	stopOnce sync.Once
 }
 
 // sockaddr_ctl specifeid in /usr/include/sys/kern_control.h
@@ -158,6 +164,7 @@ func CreateTUNFromFile(file *os.File, mtu int) (TunDevice, error) {
 	tun := &tunDarwin{
 		tunFile: file,
 		errors:  make(chan error, 5),
+		stopW:   make(chan struct{}),
 	}
 
 	name, err := tun.getName()
@@ -197,29 +204,39 @@ func CreateTUNFromFile(file *os.File, mtu int) (TunDevice, error) {
 	return tun, nil
 }
 
-func (t tunDarwin) Name() string {
+func (t *tunDarwin) Name() string {
 	return t.name
 }
 
-func (t tunDarwin) URL() string {
+func (t *tunDarwin) URL() string {
 	return t.url
 }
 
-func (t tunDarwin) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
+func (t *tunDarwin) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
+	if t.closed {
+		return nil, fmt.Errorf("device closed.")
+	}
 	if t.linkCache != nil {
 		return t.linkCache, nil
 	}
-	linkEP := channel.New(512, 9000, "")
+	mtu, err := t.getInterfaceMtu()
+
+	if err != nil {
+		return nil, errors.New("Unable to get device mtu")
+	}
+	linkEP := channel.New(512, uint32(mtu), "")
 
 	// start Read loop. read ip packet from tun and write it to ipstack
 	go func() {
-		packet := make([]byte, 2000)
+		t.wg.Add(1)
+		packet := make([]byte, mtu)
 		for {
 			n, err := t.Read(packet)
 			if err != nil {
-				log.Errorln("Can not read from tun: %v", err)
+				if !t.closed {
+					log.Errorln("Can not read from tun: %v", err)
+				}
 				break
-				// TODO: stop the tun
 			}
 			var p tcpip.NetworkProtocolNumber
 			switch header.IPVersion(packet) {
@@ -230,20 +247,33 @@ func (t tunDarwin) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
 			}
 			linkEP.Inject(p, buffer.View(packet[:n]).ToVectorisedView())
 		}
+		t.wg.Done()
+		t.stop()
+		log.Debugln("%v stop read loop", t.Name())
 	}()
 
 	// start write loop. read ip packet from ipstack and write it to tun
 	go func() {
+		t.wg.Add(1)
+	packetLoop:
 		for {
-			packet := <-linkEP.C
+			var packet channel.PacketInfo
+			select {
+			case packet = <-linkEP.C:
+			case <-t.stopW:
+				break packetLoop
+			}
 			_, err := t.Write(buffer.NewVectorisedView(len(packet.Header)+len(packet.Payload), []buffer.View{packet.Header, packet.Payload}).ToView())
 			if err != nil {
 				log.Errorln("Can not read from tun: %v", err)
 				break
-				// TODO: stop the tun
 			}
 		}
+		t.wg.Done()
+		t.stop()
+		log.Debugln("%v stop write loop", t.Name())
 	}()
+
 	t.linkCache = linkEP
 	return t.linkCache, nil
 
@@ -283,11 +313,46 @@ func (tun *tunDarwin) Write(buff []byte) (int, error) {
 	return tun.tunFile.Write(buf[:4+len(buff)])
 }
 
-func (t tunDarwin) Close() {
-	t.tunFile.Close()
+func (tun *tunDarwin) Close() {
+	tun.closed = true
+	tun.stop()
+	tun.wg.Wait()
 }
 
-func (t tunDarwin) getName() (string, error) {
+func (tun *tunDarwin) getInterfaceMtu() (int, error) {
+
+	// open datagram socket
+
+	fd, err := unix.Socket(
+		unix.AF_INET,
+		unix.SOCK_DGRAM,
+		0,
+	)
+
+	if err != nil {
+		return 0, err
+	}
+
+	defer unix.Close(fd)
+
+	// do ioctl call
+
+	var ifr [64]byte
+	copy(ifr[:], tun.name)
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		uintptr(fd),
+		uintptr(unix.SIOCGIFMTU),
+		uintptr(unsafe.Pointer(&ifr[0])),
+	)
+	if errno != 0 {
+		return 0, fmt.Errorf("failed to get MTU on %s", tun.name)
+	}
+
+	return int(*(*int32)(unsafe.Pointer(&ifr[16]))), nil
+}
+
+func (t *tunDarwin) getName() (string, error) {
 	var ifName struct {
 		name [16]byte
 	}
@@ -473,4 +538,14 @@ func (tun *tunDarwin) attachLinkLocal() error {
 	}
 
 	return nil
+}
+
+func (tun *tunDarwin) stop() {
+	tun.stopOnce.Do(func() {
+		tun.closed = true
+		close(tun.stopW)
+		tun.tunFile.Close()
+		close(tun.errors)
+	})
+
 }
