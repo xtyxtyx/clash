@@ -129,6 +129,10 @@ func (t *tunAdapter) DeviceURL() string {
 	return t.device.URL()
 }
 
+func (t *tunAdapter) Stack() *stack.Stack {
+	return t.ipstack
+}
+
 func getAddr(id stack.TransportEndpointID) socks5.Addr {
 	ipv4 := id.LocalAddress.To4()
 
