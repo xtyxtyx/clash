@@ -148,6 +148,11 @@ func (t *tunLinux) Close() {
 	})
 }
 
+// Wait wait goroutines to exit
+func (t *tunLinux) Wait() {
+	t.wg.Wait()
+}
+
 func (t *tunLinux) openDeviceByName(name string) (TunDevice, error) {
 	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
