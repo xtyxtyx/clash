@@ -28,10 +28,11 @@ const (
 )
 
 type tunLinux struct {
-	url       string
-	name      string
-	tunFile   *os.File
-	linkCache *channel.Endpoint
+	url         string
+	name        string
+	tunFile     *os.File
+	linkCache   *channel.Endpoint
+	mtuOverride uint32
 
 	closed   bool
 	stopW    chan struct{}
@@ -41,10 +42,12 @@ type tunLinux struct {
 
 // OpenTunDevice return a TunDevice according a URL
 func OpenTunDevice(deviceURL url.URL) (TunDevice, error) {
+	mtuOverride, _ := strconv.ParseInt(deviceURL.Query().Get("mtu"), 0, 32)
 
 	t := &tunLinux{
-		url:   deviceURL.String(),
-		stopW: make(chan struct{}),
+		mtuOverride: uint32(mtuOverride),
+		url:         deviceURL.String(),
+		stopW:       make(chan struct{}),
 	}
 	switch deviceURL.Scheme {
 	case "dev":
@@ -148,11 +151,6 @@ func (t *tunLinux) Close() {
 	})
 }
 
-// Wait wait goroutines to exit
-func (t *tunLinux) Wait() {
-	t.wg.Wait()
-}
-
 func (t *tunLinux) openDeviceByName(name string) (TunDevice, error) {
 	nfd, err := unix.Open(cloneDevicePath, os.O_RDWR, 0)
 	if err != nil {
@@ -224,6 +222,10 @@ func (t *tunLinux) openDeviceByFd(fd int) (TunDevice, error) {
 }
 
 func (t *tunLinux) getInterfaceMtu() (uint32, error) {
+	if t.mtuOverride > 0 {
+		return t.mtuOverride, nil
+	}
+
 	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_DGRAM, 0)
 	if err != nil {
 		return 0, err
