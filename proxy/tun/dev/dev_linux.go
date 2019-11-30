@@ -13,11 +13,8 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/Dreamacro/clash/log"
-	"github.com/google/netstack/tcpip"
-	"github.com/google/netstack/tcpip/buffer"
-	"github.com/google/netstack/tcpip/header"
 	"github.com/google/netstack/tcpip/link/channel"
+	"github.com/google/netstack/tcpip/link/fdbased"
 	"github.com/google/netstack/tcpip/stack"
 	"golang.org/x/sys/unix"
 )
@@ -81,58 +78,15 @@ func (t *tunLinux) AsLinkEndpoint() (result stack.LinkEndpoint, err error) {
 		return nil, errors.New("Unable to get device mtu")
 	}
 
-	linkEP := channel.New(512, uint32(mtu), "")
+	result, err = fdbased.New(&fdbased.Options{
+		FDs:            []int{int(t.tunFile.Fd())},
+		MTU:            mtu,
+		EthernetHeader: false,
+	})
 
-	// start Read loop. read ip packet from tun and write it to ipstack
-	go func() {
-		t.wg.Add(1)
-		packet := make([]byte, mtu)
-		for {
-			n, err := t.Read(packet)
-			if err != nil {
-				if !t.closed {
-					log.Errorln("Can not read from tun: %v", err)
-				}
-				break
-			}
-			var p tcpip.NetworkProtocolNumber
-			switch header.IPVersion(packet) {
-			case header.IPv4Version:
-				p = header.IPv4ProtocolNumber
-			case header.IPv6Version:
-				p = header.IPv6ProtocolNumber
-			}
-			linkEP.Inject(p, buffer.View(packet[:n]).ToVectorisedView())
-		}
-		t.wg.Done()
-		t.Close()
-		log.Debugln("%v stop read loop", t.Name())
-	}()
+	//t.linkCache = &result
 
-	// start write loop. read ip packet from ipstack and write it to tun
-	go func() {
-		t.wg.Add(1)
-	packetLoop:
-		for {
-			var packet channel.PacketInfo
-			select {
-			case packet = <-linkEP.C:
-			case <-t.stopW:
-				break packetLoop
-			}
-			_, err := t.Write(buffer.NewVectorisedView(len(packet.Header)+len(packet.Payload), []buffer.View{packet.Header, packet.Payload}).ToView())
-			if err != nil {
-				log.Errorln("Can not read from tun: %v", err)
-				break
-			}
-		}
-		t.wg.Done()
-		t.Close()
-		log.Debugln("%v stop write loop", t.Name())
-	}()
-
-	t.linkCache = linkEP
-	return t.linkCache, nil
+	return result, nil
 }
 
 func (t *tunLinux) Write(buff []byte) (int, error) {
