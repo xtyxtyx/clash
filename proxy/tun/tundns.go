@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	ipv4Zero = tcpip.Address(net.IPv4zero)
+	ipv4Zero = tcpip.Address(net.IPv4zero.To4())
 )
 
 // DNSServer is DNS Server listening on tun devcice
