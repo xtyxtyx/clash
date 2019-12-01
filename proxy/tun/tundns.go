@@ -22,7 +22,6 @@ const (
 
 var (
 	ipv4Zero = tcpip.Address(net.IPv4zero)
-	ipv6Zero = tcpip.Address(net.IPv6zero)
 )
 
 // DNSServer is DNS Server listening on tun devcice
@@ -37,6 +36,11 @@ type connResponseWriter struct {
 
 func (s *DNSServer) HandleConn(id stack.TransportEndpointID, conn *gonet.Conn) bool {
 	if id.LocalPort != s.dnsEndpointID.LocalPort {
+		return false
+	}
+
+	if s.dnsEndpointID.LocalAddress != id.LocalAddress &&
+		s.dnsEndpointID.LocalAddress != ipv4Zero {
 		return false
 	}
 
@@ -84,6 +88,10 @@ func (w *connResponseWriter) Hijack() {
 // CreateDNSServer create a dns server on given netstack
 func CreateDNSServer(resolver *dns.Resolver, ip net.IP, port int) *DNSServer {
 	handler := dns.NewHandler(resolver)
+
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
 
 	server := &DNSServer{
 		handler: handler,
