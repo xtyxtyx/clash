@@ -41,7 +41,6 @@ type tunAdapter struct {
 
 // NewTunProxy create TunProxy under Linux OS.
 func NewTunProxy(deviceURL string) (TunAdapter, error) {
-
 	var err error
 
 	url, err := url.Parse(deviceURL)
@@ -68,6 +67,11 @@ func NewTunProxy(deviceURL string) (TunAdapter, error) {
 		return nil, fmt.Errorf("Fail to create NIC in ipstack: %v", err)
 	}
 
+	tl := &tunAdapter{
+		device:  tundev,
+		ipstack: ipstack,
+	}
+
 	// IPv4 0.0.0.0/0
 	subnet, _ := tcpip.NewSubnet(tcpip.Address(strings.Repeat("\x00", 4)), tcpip.AddressMask(strings.Repeat("\x00", 4)))
 	ipstack.AddAddressRange(1, ipv4.ProtocolNumber, subnet)
@@ -87,7 +91,15 @@ func NewTunProxy(deviceURL string) (TunAdapter, error) {
 		r.Complete(false)
 
 		conn := gonet.NewConn(&wq, ep)
-		target := getAddr(ep.Info().(*tcp.EndpointInfo).ID)
+		id := ep.Info().(*tcp.EndpointInfo).ID
+
+		if dns := tl.dnsserver; dns != nil {
+			if dns.HandleConn(id, conn) {
+				return
+			}
+		}
+
+		target := getAddr(id)
 		tun.Add(adapters.NewSocket(target, conn, C.TUN, C.TCP))
 
 	})
@@ -95,7 +107,6 @@ func NewTunProxy(deviceURL string) (TunAdapter, error) {
 
 	// UDP handler
 	udpFwd := udp.NewForwarder(ipstack, func(r *udp.ForwarderRequest) {
-
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
 		if err != nil {
@@ -103,37 +114,35 @@ func NewTunProxy(deviceURL string) (TunAdapter, error) {
 		}
 
 		conn := gonet.NewConn(&wq, ep)
-		target := getAddr(ep.Info().(*stack.TransportEndpointInfo).ID)
+		id := ep.Info().(*stack.TransportEndpointInfo).ID
+
+		if dns := tl.dnsserver; dns != nil {
+			if dns.HandleConn(id, conn) {
+				return
+			}
+		}
+
+		target := getAddr(id)
 		tun.Add(adapters.NewSocket(target, conn, C.TUN, C.UDP))
 
 	})
 	ipstack.SetTransportProtocolHandler(udp.ProtocolNumber, udpFwd.HandlePacket)
 
-	tl := &tunAdapter{
-		device:  tundev,
-		ipstack: ipstack,
-	}
+
+
 	log.Infoln("Tun adapter have interface name: %s", tundev.Name())
 	return tl, nil
-
 }
 
 // Close close the TunAdapter
 func (t *tunAdapter) Close() {
 	t.device.Close()
-	if t.dnsserver != nil {
-		t.dnsserver.Stop()
-	}
 	t.ipstack.Close()
 }
 
 // IfName return device URL of tun
 func (t *tunAdapter) DeviceURL() string {
 	return t.device.URL()
-}
-
-func (t *tunAdapter) Stack() *stack.Stack {
-	return t.ipstack
 }
 
 func getAddr(id stack.TransportEndpointID) socks5.Addr {
