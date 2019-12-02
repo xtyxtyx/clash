@@ -50,16 +50,22 @@ func (s *DNSServer) HandleConn(id stack.TransportEndpointID, conn *gonet.Conn) b
 		defer conn.Close()
 		w := &connResponseWriter{Conn: conn}
 		var msg D.Msg
+		offset := 0
 		for {
 			conn.SetDeadline(time.Now().Add(defaultTimeout * time.Second))
 			// TODO: handle request larger than MTU
-			n, err := conn.Read(buffer[:])
+			n, err := conn.Read(buffer[offset:])
 			if err != nil {
+				return
+			}
+
+			offset += n
+
+			if msg.Unpack(buffer[:offset]) == nil {
 				break
 			}
-			msg.Unpack(buffer[:n])
-			go s.handler(w, &msg)
 		}
+		s.handler(w, &msg)
 	}()
 
 	return true
@@ -82,7 +88,7 @@ func (w *connResponseWriter) TsigTimersOnly(bool) {
 	// Unsupported
 }
 func (w *connResponseWriter) Hijack() {
-	// Unsupported
+	w.Conn.Close()
 }
 
 // CreateDNSServer create a dns server on given netstack
