@@ -5,8 +5,10 @@ import (
 	"context"
 	"crypto/tls"
 	"io/ioutil"
+	"net"
 	"net/http"
 
+	N "github.com/Dreamacro/clash/network"
 	D "github.com/miekg/dns"
 )
 
@@ -17,6 +19,19 @@ const (
 
 var dohTransport = &http.Transport{
 	TLSClientConfig: &tls.Config{ClientSessionCache: globalSessionCache},
+	DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		ip, err := BootstrapResolver.ResolveIP(host)
+		if err != nil {
+			return nil, err
+		}
+
+		return N.DefaultDialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+	},
 }
 
 type dohClient struct {

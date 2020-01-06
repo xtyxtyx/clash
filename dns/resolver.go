@@ -22,7 +22,8 @@ import (
 
 var (
 	// DefaultResolver aim to resolve ip
-	DefaultResolver *Resolver
+	DefaultResolver   *Resolver
+	BootstrapResolver *Resolver
 
 	// DefaultHosts aim to resolve hosts
 	DefaultHosts = trie.New()
@@ -55,6 +56,25 @@ type Resolver struct {
 	fallbackFilters []fallbackFilter
 	group           singleflight.Group
 	cache           *cache.Cache
+}
+
+func init() {
+	BootstrapResolver = New(Config{
+		Main: []NameServer{
+			NameServer{Net: "tcp", Addr: "1.1.1.1:53"},
+			NameServer{Net: "tcp", Addr: "208.67.222.222:53"},
+			NameServer{Net: "", Addr: "119.29.29.29:53"},
+			NameServer{Net: "", Addr: "223.5.5.5:53"},
+		},
+		Fallback:     make([]NameServer, 0),
+		IPv6:         false,
+		EnhancedMode: NORMAL,
+		Pool:         nil,
+		FallbackFilter: FallbackFilter{
+			GeoIP:  false,
+			IPCIDR: make([]*net.IPNet, 0),
+		},
+	})
 }
 
 // ResolveIP request with TypeA and TypeAAAA, priority return TypeAAAA
@@ -180,7 +200,7 @@ func (r *Resolver) IsFakeIP(ip net.IP) bool {
 }
 
 func (r *Resolver) batchExchange(clients []resolver, m *D.Msg) (msg *D.Msg, err error) {
-	fast, ctx := picker.WithTimeout(context.Background(), time.Second * 5)
+	fast, ctx := picker.WithTimeout(context.Background(), time.Second*5)
 	for _, client := range clients {
 		r := client
 		fast.Go(func() (interface{}, error) {

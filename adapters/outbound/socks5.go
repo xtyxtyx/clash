@@ -106,7 +106,7 @@ func (ss *Socks5) DialUDP(metadata *C.Metadata) (_ C.PacketConn, _ net.Addr, err
 		return nil, nil, fmt.Errorf("parse address %s error: %s", metadata.String(), metadata.DstPort)
 	}
 
-	pc, err := net.ListenPacket("udp", "")
+	pc, err := listenPacket("udp", "")
 	if err != nil {
 		return
 	}

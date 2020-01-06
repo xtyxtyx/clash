@@ -14,6 +14,7 @@ import (
 	"github.com/Dreamacro/clash/component/socks5"
 	C "github.com/Dreamacro/clash/constant"
 	"github.com/Dreamacro/clash/dns"
+	N "github.com/Dreamacro/clash/network"
 )
 
 const (
@@ -107,7 +108,7 @@ func dialContext(ctx context.Context, network, address string) (net.Conn, error)
 	var primary, fallback dialResult
 
 	startRacer := func(ctx context.Context, host string, ipv6 bool) {
-		dialer := net.Dialer{}
+		dialer := N.DefaultDialer
 		result := dialResult{ipv6: ipv6, done: true}
 		defer func() {
 			select {
@@ -164,6 +165,10 @@ func dialContext(ctx context.Context, network, address string) (net.Conn, error)
 			}
 		}
 	}
+}
+
+func listenPacket(network, address string) (net.PacketConn, error) {
+	return N.DefaultListenConfig.ListenPacket(context.Background(), network, address)
 }
 
 func resolveUDPAddr(network, address string) (*net.UDPAddr, error) {

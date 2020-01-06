@@ -26,7 +26,7 @@ func (d *Direct) DialContext(ctx context.Context, metadata *C.Metadata) (C.Conn,
 }
 
 func (d *Direct) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
-	pc, err := net.ListenPacket("udp", "")
+	pc, err := listenPacket("udp", "")
 	if err != nil {
 		return nil, nil, err
 	}

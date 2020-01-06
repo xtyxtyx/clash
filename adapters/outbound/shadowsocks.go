@@ -83,7 +83,7 @@ func (ss *ShadowSocks) DialContext(ctx context.Context, metadata *C.Metadata) (C
 }
 
 func (ss *ShadowSocks) DialUDP(metadata *C.Metadata) (C.PacketConn, net.Addr, error) {
-	pc, err := net.ListenPacket("udp", "")
+	pc, err := listenPacket("udp", "")
 	if err != nil {
 		return nil, nil, err
 	}

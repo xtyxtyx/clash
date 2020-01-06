@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"net"
 	"time"
 
 	"github.com/Dreamacro/clash/common/cache"
@@ -125,6 +126,11 @@ func transform(servers []NameServer) []resolver {
 			continue
 		}
 
+		host, _, err := net.SplitHostPort(s.Addr)
+		if err != nil {
+			host = s.Addr
+		}
+
 		ret = append(ret, &client{
 			Client: &D.Client{
 				Net: s.Net,
@@ -132,6 +138,7 @@ func transform(servers []NameServer) []resolver {
 					ClientSessionCache: globalSessionCache,
 					// alpn identifier, see https://tools.ietf.org/html/draft-hoffman-dprive-dns-tls-alpn-00#page-6
 					NextProtos: []string{"dns"},
+					ServerName: host,
 				},
 				UDPSize: 4096,
 			},
