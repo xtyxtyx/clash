@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"github.com/Dreamacro/clash/common/mmdb"
+	"github.com/Dreamacro/clash/component/mmdb"
 	C "github.com/Dreamacro/clash/constant"
 )
 
