@@ -31,9 +31,5 @@ func Instance() *geoip2.Reader {
 		}
 	})
 
-	return InstanceOrNull()
-}
-
-func InstanceOrNull() *geoip2.Reader {
 	return mmdb
 }
