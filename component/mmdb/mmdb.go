@@ -10,7 +10,7 @@ import (
 )
 
 var mmdb *geoip2.Reader
-var once *sync.Once
+var once sync.Once
 
 func LoadFromBytes(buffer []byte) {
 	once.Do(func() {
