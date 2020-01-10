@@ -12,7 +12,7 @@ import (
 var mmdb *geoip2.Reader
 var once *sync.Once
 
-func LoadFromByte(buffer []byte) {
+func LoadFromBytes(buffer []byte) {
 	once.Do(func() {
 		var err error
 		mmdb, err = geoip2.FromBytes(buffer)
